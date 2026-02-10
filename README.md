@@ -733,6 +733,192 @@ graph LR;
    A --> B;
 ```
 
+
+### Урок 3/5: Как исправить коммит
+Исправления в только что выполненный коммит вносятся с помощью опции `--amend` (англ. "исправить", "дополнить") у команда `commit`: `git commit --amend`
+
+Опция `--amend` работает только с последним коммитом `HEAD`. Для исправления более ранних коммитов есть другие команды.
+
+Создадим тренировочный репозиторий:
+```sh
+$ mkdir ~/dev/commit-amend-fun
+$ cd ~/dev/commit-amend-fun
+$ git init
+```
+
+Дополнить коммит новыми файлами - `git commit --amend --no-edit`
+
+Представим, что делаем небольшой сайт и для этого создали файл `main.html`, а также файл со стилями `common.css`
+
+```sh
+$ touch main.html
+$ touch common.css
+# дальше отредактировали оба файла
+```
+
+В какой-то момент забыли о файле `common.css` и добавили в коммит только `main.html`
+
+```sh
+$ git add main.html
+$ git commit -m "Добавить главную страницу"
+$ git log --oneline
+777fec3 Добавить главную страницу
+```
+
+Файл `common.css` так и остался висеть в `untracked`. Это видно в `git status`:
+
+```sh
+$ git status
+On branch main
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+          common.css
+
+nothing added to commit but untracked files present (use "git add" to track)
+```
+
+Дополним последний коммит забытым файлом `common.css` с помощью опции `--amend`:
+
+```sh
+$ git add common.css
+# добавили файл common.css в список на коммит как обычно
+
+# но вместо команды commit -m '...'
+# будет:
+$ git commit --amend --no-edit
+
+$ git log --oneline
+8340eb2 Добавить главную страницу
+# коммит в истории всё ещё один (но у него новый хеш)
+```
+
+С опцией `--amend` команда `commit` не создаст новый коммит, а дополнит последний, добавив в него файл `common.css`. При этом хеш последнего коммита изменится, потому что изменился список файлов в коммите.
+
+Обратим внимание на опцию `--no-edit`. Она сообщает команде `commit`, что сообщение коммита нужно оставить как было.
+
+Точно так же можно добавить не новый файл, а дополнительные изменения в уже добавленном в коммит файле.
+
+```sh
+# ещё раз отредактировали main.html
+
+$ git add main.html # добавили в список на коммит
+$ git commit --amend --no-edit
+```
+
+Что же выбрать - новый коммит или `--amend`?
+Если логичнее вносить изменения одним коммитом (если они связанные), то лучше оформлять их одним коммитом.
+
+Изменить сообщение коммита - `git commit --amend -m "Новое сообщение"`
+
+Может быть так, что добавлять файлы не нужно, зато изменить сообщение нужно.
+
+```sh
+$ git commit --amend -m "Добавить главную страницу и стили"
+$ git log --oneline
+a31fa24 Добавить главную страницу и стили
+```
+
+Если забыть указать у команды `git commit --amend` один из флагов (`--no-edit` или `-m`), Git предложит отредактировать сообщение коммита вручную. Для этого откроется текстовый редактор, установленный по умолчанию - **GNU nano** либо **Vim**.
+
+#### nano - простой и свободный
+Чтобы выйти, нужно нажать `^X` = `Ctrl+X`
+
+#### Vim - великий и ужасный
+Чтобы выйти:
+1. Нажать `Esc`
+2. Набрать `:qa!`
+3. Нажать `Enter`
+
+Учебник по Vim:
+`vimtutor ru` или `vimtutor`
+
+### Урок 4/5: Как откатиться назад, если "всё сломалось"
+На разных этапах работы с Git могут возникать проблемы:
+* В список на коммит попал лишний файл (например, временный). Нужно вынуть его из списка
+* Последние несколько коммитов ошибочные. Нужно откатить сразу несколько коммитов, вернуть как было вчера
+* Случайно изменился файл, который вообще не должен был меняться. Например, открыли ошибочно не тот файл
+
+Выполнить unstage изменений - `git restore --staged <file>`
+Допустим, создали или изменили какой-то файл и добавили его в список на коммит командой `git add`, но потом передумали включать его туда. Убрать файл из staging поможет команда `git restore --staged <file>`
+
+В команде `git status` есть подсказка в скобках: `use "git restore --staged <file>..." to unstage`
+
+```sh
+$ touch example.txt # создали ненужный файл
+$ git add example.txt # добавили его в staged
+
+$ git status # проверили статус
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+        new file:   example.txt
+
+$ git restore --staged example.txt
+$ git status # проверили статус
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        example.txt
+
+no changes added to commit (use "git add" and/or "git commit -a")
+# файл example.txt из staged вернулся обратно в untracked
+```
+Вызов `git restore --staged example.txt` перевёл `example.txt` из `staged` обратно в `untracked`.
+
+Чтобы сбросить все файлы из `staged` обратно в `untracked`/`modified`, можно воспользоваться командой `git restore --staged .`: она сбросит всю текущую папку.
+
+Раньше для этой операции использовали `git reset HEAD`. Но `git reset` перегруженная: она умеет делать много разных действий в зависимости от переданных параметров. Чтобы было меньше путаницы, в Git была добавлена отдельная команда `git restore`.
+
+"Откатить коммит" - `git reset --hard <commit hash>`
+Иногда нужно откатить то, что уже было закоммичено. Для этого используют `git reset --hard <commit hash>`.
+
+```sh
+$ git log --oneline # хеш можно найти в истории
+7b972f5 (HEAD -> master) style: добавить комментарии, расставить отступы
+b576d89 feat: добавить массив Expenses и цикл для добавления трат # вот сюда и вернёмся
+4b58962 refactor: разделить analyzeExpenses() на countSum() и saveExpenses()
+
+$ git reset --hard b576d89
+# теперь мы на этом коммите
+HEAD is now at b576d89 feat: добавить массив Expenses и цикл для добавления трат
+```
+
+Состояние откатилось на указанный коммит. Самый последний коммит был удалён.
+
+```sh
+$ git log --oneline
+b576d89 (HEAD -> master) feat: добавить массив Expenses и цикл для добавления трат
+4b58962 refactor: разделить analyzeExpenses() на countSum() и saveExpenses()
+```
+
+**БУДЬТЕ ОСТОРОЖНЫ С `git restore --hard` - МОЖНО ПОТЕРЯТЬ ЧТО-ТО НУЖНОЕ**
+
+Откатить изменения, которые не попали ни в staging, ни в коммит - `git restore <file>`
+
+Может быть так, что случайно изменили файл, который не планировали. Теперь он отображается в `Changes not staged for commit`(`modified`). Чтобы вернуть как было, нужно выполнить `git restore <file>`
+
+```sh
+# случайно изменили файл example.txt
+$ git status
+On branch main
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+          modified:   example.txt
+
+$ git restore example.txt
+$ git status
+On branch main
+nothing to commit, working tree clean
+```
+
+Изменения в файле откатятся до последней версии, которая была сохранена через `git commit` или `git add`.
+
+- Команда `git restore --staged <file>` переведёт файл из `staged` обратно в `modified` или `untracked`.
+- Команда `git reset --hard <commit hash>` «откатит» историю до коммита с хешем `<hash>`. Более поздние коммиты потеряются!
+- Команда `git restore <file>` «откатит» изменения в файле до последней сохранённой (в коммите или в staging) версии.
+
+### Урок 5/5: Практическая работа №3. Нужно откатить изменения
+Done
 # Основы работы с ветками в Git
 
 # Продвинутая командная работа с Git
